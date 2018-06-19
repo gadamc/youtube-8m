@@ -27,6 +27,7 @@ The binary only processes the video stream (images) and not the audio stream.
 import csv
 import os
 import sys
+import json
 
 import cv2
 import feature_extractor
@@ -126,7 +127,7 @@ def _make_bytes(int_array):
     return bytes(int_array)
 
 
-def quantize(features, min_quantized_value=-2.0, max_quantized_value=2.0):
+def quantize(features, min_quantized_value=-2.0, max_quantized_value=2.0, return_as_bytes=False):
   """Quantizes float32 `features` into string."""
   assert features.dtype == 'float32'
   assert len(features.shape) == 1  # 1-D array
@@ -135,8 +136,10 @@ def quantize(features, min_quantized_value=-2.0, max_quantized_value=2.0):
   features = (features - min_quantized_value) * (255.0 / quantize_range)
   features = [int(round(f)) for f in features]
 
-  return _make_bytes(features)
-
+  if return_as_bytes:
+    return _make_bytes(features)
+  else:
+    return features
 
 def main(unused_argv):
   extractor = feature_extractor.YouTube8MFeatureExtractor(FLAGS.model_dir)
@@ -145,15 +148,19 @@ def main(unused_argv):
   total_error = 0
   for video_file, labels in csv.reader(open(FLAGS.input_videos_csv)):
     rgb_features = []
+    rgb_features_json = []
     sum_rgb_features = None
     for rgb in frame_iterator(
         video_file, every_ms=1000.0/FLAGS.frames_per_second):
       features = extractor.extract_rgb_frame_features(rgb[:, :, ::-1])
       if sum_rgb_features is None:
-        sum_rgb_features = features
+        sum_rgb_features = quantize(features, return_as_bytes=False)
       else:
-        sum_rgb_features += features
-      rgb_features.append(_bytes_feature(quantize(features)))
+        sum_rgb_features += quantize(features, return_as_bytes=False)
+      
+      qfeatures = quantize(features, return_as_bytes=False)
+      rgb_features.append(_bytes_feature(_make_bytes(qfeatures)))
+      rgb_features_json.append(qfeatures)
 
     if not rgb_features:
       print >> sys.stderr, 'Could not get features for ' + video_file
@@ -200,13 +207,20 @@ def main(unused_argv):
 
 
     #write out to json
+
     jsout = {
-      'filename':video_file,
+      'filename':os.path.basename(video_file),
       'frames_per_second':FLAGS.frames_per_second,
       'labels':labels.split(';'),
-      'mean_rgb': mean_rgb_features,
-      'rgb':rgb_features
+      'mean_rgb': mean_rgb_features.tolist(),
+      'rgb':rgb_features_json
     }
+    
+    outputfile = os.path.join(os.path.dirname(FLAGS.output_tfrecords_file),"{}.json".format(os.path.basename(video_file)))
+
+    
+    with open(outputfile, 'w') as outfile:
+      json.dump(jsout, outfile)
     
   writer.close()
   print('Successfully encoded %i out of %i videos' % (
