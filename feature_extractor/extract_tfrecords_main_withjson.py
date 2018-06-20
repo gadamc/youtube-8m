@@ -126,6 +126,12 @@ def _make_bytes(int_array):
   else:
     return bytes(int_array)
 
+def clip_n_scale(features, min_value=-2.0, max_value=2.0):
+  assert features.dtype == 'float32'
+  assert len(features.shape) == 1  # 1-D array
+  features = numpy.clip(features, min_value, max_value)
+  _range = (max_value - min_value)/2.
+  return features / _range
 
 def quantize(features, min_quantized_value=-2.0, max_quantized_value=2.0, return_as_bytes=False):
   """Quantizes float32 `features` into string."""
@@ -154,13 +160,14 @@ def main(unused_argv):
         video_file, every_ms=1000.0/FLAGS.frames_per_second):
       features = extractor.extract_rgb_frame_features(rgb[:, :, ::-1])
       if sum_rgb_features is None:
-        sum_rgb_features = quantize(features, return_as_bytes=False)
+        sum_rgb_features = features
       else:
-        sum_rgb_features += quantize(features, return_as_bytes=False)
+        sum_rgb_features += features
       
       qfeatures = quantize(features, return_as_bytes=False)
+      
       rgb_features.append(_bytes_feature(_make_bytes(qfeatures)))
-      rgb_features_json.append(qfeatures)
+      rgb_features_json.append(features.tolist())
 
     if not rgb_features:
       print >> sys.stderr, 'Could not get features for ' + video_file
@@ -208,16 +215,25 @@ def main(unused_argv):
 
     #write out to json
 
+    # median_rgb = numpy.median(rgb_features_json,axis=0)
+    # print(type(median_rgb))
+    # print('median_rgb shape: {}'.format(median_rgb.shape))
+    # median_rgb_list = median_rgb.tolist()
+    # print(type(median_rgb_list))
+    # print('median_rgb_list len: {}'.format(len(median_rgb_list)))
+
     jsout = {
       'filename':os.path.basename(video_file),
       'frames_per_second':FLAGS.frames_per_second,
       'labels':labels.split(';'),
       'mean_rgb': mean_rgb_features.tolist(),
-      'rgb':rgb_features_json
+      'rgb':rgb_features_json,
+      'median_rgb':numpy.median(rgb_features_json,axis=0).tolist()
     }
     
     outputfile = os.path.join(os.path.dirname(FLAGS.output_tfrecords_file),"{}.json".format(os.path.basename(video_file)))
 
+    
     
     with open(outputfile, 'w') as outfile:
       json.dump(jsout, outfile)
