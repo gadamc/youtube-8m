@@ -54,6 +54,9 @@ if __name__ == '__main__':
   flags.DEFINE_string('model_dir', os.path.join(os.getenv('HOME'), 'yt8m'),
                       'Directory to store model files. It defaults to ~/yt8m')
 
+  flags.DEFINE_string('output_video_name_line_count', None,
+                      'CSV file with lines "<video_file>,<line count>"')
+
   # The following flags are set to match the YouTube-8M dataset format.
   flags.DEFINE_integer('frames_per_second', 1,
                        'This many frames per second will be processed')
@@ -152,7 +155,11 @@ def main(unused_argv):
   writer = tf.python_io.TFRecordWriter(FLAGS.output_tfrecords_file)
   total_written = 0
   total_error = 0
+
+  linecountwriter = csv.writer(open(FLAGS.output_video_name_line_count, 'w', newline=''), delimiter = ',')
+
   for video_file, labels in csv.reader(open(FLAGS.input_videos_csv)):
+    print(video_file)
     rgb_features = []
     rgb_features_json = []
     sum_rgb_features = None
@@ -178,6 +185,7 @@ def main(unused_argv):
 
     print("finished feature extraction")
     print(len(rgb_features))
+    linecountwriter.writerow([video_file, len(rgb_features)])
 
     # Create SequenceExample proto and write to output.
     feature_list = {
