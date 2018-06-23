@@ -46,7 +46,7 @@ if __name__ == '__main__':
   # Required flags for input and output.
   flags.DEFINE_string('output_tfrecords_file', None,
                       'File containing tfrecords will be written at this path.')
-  flags.DEFINE_string('input_videos_csv', None,
+  flags.DEFINE_string('input_videos_csv', 'vid_dataset.csv',
                       'CSV file with lines "<video_file>,<labels>", where '
                       '<video_file> must be a path of a video and <labels> '
                       'must be an integer list joined with semi-colon ";"')
@@ -54,7 +54,7 @@ if __name__ == '__main__':
   flags.DEFINE_string('model_dir', os.path.join(os.getenv('HOME'), 'yt8m'),
                       'Directory to store model files. It defaults to ~/yt8m')
 
-  flags.DEFINE_string('output_video_name_line_count', None,
+  flags.DEFINE_string('output_video_name_line_count', 'video_line_count.csv',
                       'CSV file with lines "<video_file>,<line count>"')
 
   # The following flags are set to match the YouTube-8M dataset format.
